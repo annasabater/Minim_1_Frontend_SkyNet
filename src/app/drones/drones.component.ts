@@ -3,42 +3,48 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { CommonModule } from '@angular/common';
 import { DronesService, Drone } from '../services/drones.services';
 import { AuthService } from '../services/auth.service';
+import { CategoryService } from '../services/category.services';
+import { Category } from '../models/category.model';
+import { FilterByIdPipe } from '../pipes/filter-by-id.pipe'; // Para mmostrar categoria
 
 @Component({
   selector: 'app-drones',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FilterByIdPipe],
   templateUrl: './drones.component.html',
   styleUrls: ['./drones.component.css']
 })
 export class DronesComponent implements OnInit {
   drones: Drone[] = [];
-  filteredDrones: Drone[] = []; // para mostrar drones según categoría
+  filteredDrones: Drone[] = []; 
   droneForm!: FormGroup;
   editing: boolean = false;
   currentDroneId: string = '';
-  showForm: boolean = false; // controla mostrar/ocultar formulario
-  currentUserId: string | null = null; // para saber quién es el usuario
+  showForm: boolean = false;
+  currentUserId: string | null = null;
+
+  // Lista de categorías disponibles 
+  availableCategories: Category[] = [];
 
   constructor(
     private dronesService: DronesService,
     private fb: FormBuilder,
-    private authService: AuthService
+    private authService: AuthService,
+    private categoryService: CategoryService
   ) {}
 
   ngOnInit(): void {
-    // Obtenemos el userId actual (si está logueado)
     this.currentUserId = this.authService.getUserId();
     this.loadDrones();
+    this.loadCategories();  // Cargamos las categorías disponibles
     this.initForm();
   }
 
-  // Cargar la lista de drones del backend
+  // Cargar drones desde el backend
   loadDrones(): void {
     this.dronesService.getAll().subscribe({
       next: (data) => {
         this.drones = data;
-        // Por defecto, muestra todos los drones disponibles
         this.filteredDrones = data;
       },
       error: (err) => {
@@ -47,7 +53,19 @@ export class DronesComponent implements OnInit {
     });
   }
 
-  // Inicializa el formulario de creación/edición
+  loadCategories(): void {
+    // Se utiliza paginación con valores altos para obtener todas
+    this.categoryService.getCategories(1, 100, '').subscribe({
+      next: (response) => {
+        this.availableCategories = response.categories;
+      },
+      error: (err) => {
+        console.error('Error al cargar categorías', err);
+      }
+    });
+  }
+
+  // Inicializar el formulario de creación/edición
   initForm(): void {
     this.droneForm = this.fb.group({
       id: ['', Validators.required],
@@ -60,28 +78,26 @@ export class DronesComponent implements OnInit {
       condition: ['nuevo', Validators.required],
       location: ['', Validators.required],
       contact: ['', Validators.required],
-      category: ['', Validators.required],
-      // sellerId se establece en el backend según el token
-      // pero si tu backend requiere un valor en el body, déjalo (aunque se sobrescriba)
+      // Se utiliza un array para permitir seleccionar una o varias categorías
+      categories: [[], Validators.required],
       sellerId: ['', Validators.required]
     });
   }
 
-  // Envía el formulario: crea o actualiza un dron
+  // Envía el formulario para crear o actualizar un dron
   onSubmit(): void {
     if (this.droneForm.invalid) {
       this.droneForm.markAllAsTouched();
       return;
     }
 
-    // Convierte la cadena de imágenes en un array
     const formValue = { ...this.droneForm.value };
+    // Convertir imágenes de cadena a array (si es necesario)
     if (formValue.images && typeof formValue.images === 'string') {
       formValue.images = formValue.images.split(',').map((img: string) => img.trim());
     }
 
     if (this.editing) {
-      // Actualiza el dron
       this.dronesService.update(this.currentDroneId, formValue).subscribe({
         next: () => {
           alert('Dron actualizado exitosamente.');
@@ -94,7 +110,6 @@ export class DronesComponent implements OnInit {
         }
       });
     } else {
-      // Crea un nuevo dron
       this.dronesService.create(formValue).subscribe({
         next: () => {
           alert('Dron creado exitosamente.');
@@ -109,10 +124,10 @@ export class DronesComponent implements OnInit {
     }
   }
 
-  // Rellena el formulario con los datos del dron a editar
+  // Rellenar el formulario con los datos del dron a editar
   onEdit(drone: Drone): void {
     this.editing = true;
-    this.showForm = true; // muestra el formulario al editar
+    this.showForm = true;
     this.currentDroneId = drone._id || '';
     this.droneForm.patchValue({
       id: drone.id,
@@ -125,12 +140,13 @@ export class DronesComponent implements OnInit {
       condition: drone.condition,
       location: drone.location,
       contact: drone.contact,
-      category: drone.category,
+      // Se asume que drone.categories es un array de IDs
+      categories: drone.categories,
       sellerId: drone.sellerId
     });
   }
 
-  // Elimina un dron
+  // Eliminar un dron
   onDelete(drone: Drone): void {
     if (!this.authService.isLoggedIn()) {
       alert('Debes iniciar sesión para eliminar un dron.');
@@ -154,7 +170,7 @@ export class DronesComponent implements OnInit {
   resetForm(): void {
     this.editing = false;
     this.currentDroneId = '';
-    this.showForm = false; // oculta el formulario tras guardar o cancelar
+    this.showForm = false;
     this.droneForm.reset({
       id: '',
       name: '',
@@ -166,14 +182,13 @@ export class DronesComponent implements OnInit {
       condition: 'nuevo',
       location: '',
       contact: '',
-      category: '',
+      categories: [],
       sellerId: ''
     });
   }
 
-  // Muestra u oculta el formulario de creación
+  // Muestra u oculta el formulario de creación/edición
   toggleForm(): void {
-    // Si no está logueado, no puede crear
     if (!this.authService.isLoggedIn()) {
       alert('Debes iniciar sesión para crear un dron.');
       return;
@@ -184,19 +199,14 @@ export class DronesComponent implements OnInit {
     }
   }
 
-  // Filtra drones por categoría (o tipo, como “venta”, “alquiler”, etc.)
-  filterByCategory(cat: string): void {
-    // Si prefieres filtrar en el backend, usa getByCategory(cat).
-    // Aquí, filtras en memoria:
+  // Filtrar drones por categoría (usando el ID de la categoría)
+  filterByCategory(categoryId: string): void {
     this.filteredDrones = this.drones.filter((drone) => {
-      return (
-        drone.type === cat ||
-        drone.category.toLowerCase() === cat.toLowerCase()
-      );
+      return drone.categories && drone.categories.includes(categoryId);
     });
   }
 
-  // Compramos el dron si no es del usuario actual
+  // Acción para comprar un dron
   onBuy(drone: Drone): void {
     if (!this.authService.isLoggedIn()) {
       alert('Debes iniciar sesión para comprar un dron.');
@@ -205,8 +215,6 @@ export class DronesComponent implements OnInit {
     this.dronesService.purchase(drone._id!).subscribe({
       next: (res) => {
         alert(res.message || 'Compra realizada con éxito.');
-        // Tras comprar, se marca como vendido en el backend.
-        // Recargamos la lista de drones (el vendido desaparecerá).
         this.loadDrones();
       },
       error: (err) => {
@@ -216,13 +224,12 @@ export class DronesComponent implements OnInit {
     });
   }
 
-  // Agregar reseña a un dron
+  // Agregar una reseña a un dron
   onAddReview(drone: Drone): void {
     if (!this.authService.isLoggedIn()) {
       alert('Debes iniciar sesión para dejar una reseña.');
       return;
     }
-    // Ejemplo: prompt para rating y comentario
     const ratingStr = prompt('Ingresa tu calificación (1 a 5):');
     if (!ratingStr) return;
     const rating = parseInt(ratingStr, 10);
@@ -232,7 +239,6 @@ export class DronesComponent implements OnInit {
     this.dronesService.addReview(drone._id!, rating, comment).subscribe({
       next: (res) => {
         alert(res.message || 'Reseña agregada con éxito.');
-        // Podrías recargar el dron o la lista para ver la reseña.
       },
       error: (err) => {
         console.error('Error al agregar reseña', err);
@@ -241,7 +247,7 @@ export class DronesComponent implements OnInit {
     });
   }
 
-  // Verificamos si el dron es del usuario actual
+  // Verifica si el dron es del usuario actual
   isOwner(drone: Drone): boolean {
     return drone.sellerId === this.currentUserId;
   }

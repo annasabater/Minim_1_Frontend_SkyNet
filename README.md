@@ -1,6 +1,11 @@
-# AngularSeminari6
+# Angular Minim 1
+Que he echo en el frontend:
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.0.
+El modelo Category, un CategoryComponent que muestra la lista de categorías y permite realizar búsquedas y operaciones CRUD, y un CategoryService que se encarga de consumir el endpoint del backend.
+
+El componente de categorías usa el servicio para obtener el listado paginado y buscar categorías, así como para crear, actualizar y eliminar categorías.
+
+En la vista de drones (en el componente DronesComponent),  dispone de una sección que muestra categorías.
 
 ## Ejercicio
 

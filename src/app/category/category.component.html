@@ -1,0 +1,53 @@
+<div>
+    <h2>Categories</h2>
+  
+    <!-- Buscador -->
+    <input type="text" [(ngModel)]="search" placeholder="Search categories..." />
+    <button (click)="searchCategories()">Search</button>
+  
+    <!-- Lista de Categorías -->
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Priority</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let category of categories">
+          <td>
+            <input [(ngModel)]="category.name" />
+          </td>
+          <td>
+            <input [(ngModel)]="category.description" />
+          </td>
+          <td>
+            <input type="number" [(ngModel)]="category.priority" />
+          </td>
+          <td>
+            <button (click)="updateCategory(category)">Update</button>
+            <button (click)="deleteCategory(category._id!)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  
+    <!-- Paginación simple -->
+    <div>
+      <button (click)="onPageChange(page - 1)" [disabled]="page <= 1">Previous</button>
+      <span>Page {{ page }}</span>
+      <button (click)="onPageChange(page + 1)" [disabled]="(page * limit) >= total">Next</button>
+    </div>
+  
+    <!-- Crear Categoría -->
+    <h3>Create New Category</h3>
+    <div>
+      <input type="text" [(ngModel)]="newCategory.name" placeholder="Name" />
+      <input type="text" [(ngModel)]="newCategory.description" placeholder="Description" />
+      <input type="number" [(ngModel)]="newCategory.priority" placeholder="Priority" />
+      <button (click)="createCategory()">Create</button>
+    </div>
+  </div>
+  

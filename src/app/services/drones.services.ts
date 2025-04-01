@@ -15,12 +15,13 @@ export interface Drone {
   condition: 'nuevo' | 'usado';
   location: string;
   contact: string;
-  category: string;
+  categories: string[];
   sellerId: string;
   createdAt?: Date;
   ratings?: Array<{ userId: string; rating: number; comment: string }>;
   status?: 'disponible' | 'vendido';
 }
+
 
 @Injectable({
   providedIn: 'root'
